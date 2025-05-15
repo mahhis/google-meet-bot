@@ -48,7 +48,7 @@ To install and run the bot, follow these steps:
 - `GOOGLE_CLIENT_ID` - Go to https://console.cloud.google.com and get it 
 - `GOOGLE_SECRET_KEY` - Go to https://console.cloud.google.com and get it 
 
-- `GOOGLE_ACCESS_TOKEN` and  `GOOGLE_ACCESS_TOKEN` - Required values ​​for authorization of the account from which the link will be generated
+- `GOOGLE_REFRESH_TOKEN` and  `GOOGLE_ACCESS_TOKEN` - Required values ​​for authorization of the account from which the link will be generated
 
     ```bash
     node src/helpers/google-auth.js
