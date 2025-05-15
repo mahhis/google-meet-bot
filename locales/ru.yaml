@@ -1,0 +1,11 @@
+name: Русский
+start: | 
+ гугл мит вызвали ${data.counter} раз
+
+ сменить язык /language
+ change /language
+
+
+language: Пожалуйста, выберите язык.
+
+language_selected: <b>Бот</b> теперь говорит по-русски.
