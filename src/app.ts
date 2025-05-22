@@ -49,15 +49,15 @@ async function runApp() {
     }
 
     const escapedLink = escapeMarkdownV2(ctx.dbuser.googleMeetLink)
-    const escapedAd = escapeMarkdownV2('this can be your ad')
+    const escapedAd = escapeMarkdownV2('@givemegooglemeetbot')
 
     const msg = `${escapedLink}\n\n||${escapedAd}||`
 
     const result: InlineQueryResultArticle = {
       type: 'article',
       id: uuid(),
-      title: 'Google Meet',
-      description: 'click me to create',
+      title: 'Click me to create a Google Meet link',
+      description: 'Нажмите на меня, чтобы создать ссылку на Google Meet',
       input_message_content: {
         message_text: msg,
         parse_mode: 'MarkdownV2',

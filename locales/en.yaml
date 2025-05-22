@@ -2,9 +2,6 @@ name: English
 start: | 
  google meet called ${data.counter} times
  
- change /language
- сменить язык /language
-
 language: Please select a language.
 
 language_selected: <b>This bot</b> now speaks English.
