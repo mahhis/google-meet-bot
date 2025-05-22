@@ -56,8 +56,8 @@ async function runApp() {
     const result: InlineQueryResultArticle = {
       type: 'article',
       id: uuid(),
-      title: 'Click me to create a Google Meet link',
-      description: 'Нажмите на меня, чтобы создать ссылку на Google Meet',
+      title: 'Google Meet',
+      description: 'click me to create',
       input_message_content: {
         message_text: msg,
         parse_mode: 'MarkdownV2',
