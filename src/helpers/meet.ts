@@ -70,29 +70,46 @@ export default async function createMeetLink(
   user?: User,
   overrideAccessType?: MeetAccessType
 ): Promise<string> {
-  const accessToken = await getAccessToken(user)
-
   const accessType: MeetAccessType = overrideAccessType
     ? overrideAccessType
     : user?.isAuthorized
-      ? 'DEFAULT'
-      : 'OPEN'
+    ? 'DEFAULT'
+    : 'OPEN'
 
-  const { data } = await axios.post(
-    'https://meet.googleapis.com/v2/spaces',
-    {
-      config: {
-        accessType,
-      },
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-    }
-  )
+  // Для публичных ссылок достаточно универсальной ссылки \u2014 без OAuth.
+  if (accessType === 'OPEN') {
+    return 'https://meet.google.com/new'
+  }
 
-  // `meetingUri` is full URL; `meetingCode` is just the code
-  return data.meetingUri as string
+  // Для приватных ссылок нужен accessToken.
+  let accessToken: string
+  try {
+    accessToken = await getAccessToken(user)
+  } catch (err) {
+    // Если не удалось получить токен \u2014 отдаём fallback.
+    return 'https://meet.google.com/new'
+  }
+
+  try {
+    const { data } = await axios.post(
+      'https://meet.googleapis.com/v2/spaces',
+      {
+        config: {
+          accessType,
+        },
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    )
+
+    // `meetingUri` is полный URL; `meetingCode` \u2014 только код
+    return data.meetingUri as string
+  } catch (error) {
+    // Любая ошибка API \u2014 fallback
+    return 'https://meet.google.com/new'
+  }
 }
