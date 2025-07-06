@@ -20,6 +20,16 @@ export class User {
   language!: string
   @prop({})
   googleMeetLink?: string
+
+  // OAuth-related properties
+  @prop({ default: false })
+  isAuthorized!: boolean
+  @prop({})
+  refreshToken?: string
+  @prop({})
+  accessToken?: string
+  @prop({})
+  tokenExpiry?: Date
 }
 
 export const UserModel = getModelForClass(User)

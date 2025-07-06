@@ -15,4 +15,8 @@ export default cleanEnv(process.env, {
 
   GOOGLE_CLIENT_ID: str(),
   GOOGLE_SECRET_KEY: str(),
+  BOT_URL: str(), // The public URL where the bot is hosted, needed for OAuth redirect
+
+  // Optional port for the internal Express server – defaults to 3000
+  PORT: str({ default: '3000' }),
 })

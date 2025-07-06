@@ -5,3 +5,25 @@ start: |
 language: Please select a language.
 
 language_selected: <b>This bot</b> now speaks English.
+
+auth:
+  instructions: To create personalized Google Meet links, please authorize with your Google account.
+  button: Authorize with Google
+  success: Authorization successful! You can now create personalized Google Meet links.
+  error: An error occurred during authorization. Please try again.
+  no_user_id: Could not identify your user ID. Please try again.
+  already_authorized: You are already authorized! You can now create personalized Google Meet links.
+
+revoke:
+  no_user_id: Could not identify your user ID. Please try again.
+  not_authorized: You are not currently authorized with Google.
+  success: Authorization successfully revoked. You will now receive open-access Google Meet links.
+  error: An error occurred while revoking authorization. Please try again.
+
+inline:
+  open_title: Public Google Meet
+  open_description: Click to create a public meeting link
+  private_title: Private Google Meet
+  private_description: Click to create a private meeting link (requires auth)
+  auth_required_title: Authorization required
+  auth_required_description: You need to authorize with Google to create private links
