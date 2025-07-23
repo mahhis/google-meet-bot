@@ -14,6 +14,7 @@ const BOT_URL = process.env.BOT_URL || 'https://your-bot-domain.com'
 const SCOPES = [
   'https://www.googleapis.com/auth/calendar',
   'https://www.googleapis.com/auth/calendar.events',
+  'https://www.googleapis.com/auth/meetings.space.created',
 ]
 
 /**

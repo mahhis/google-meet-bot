@@ -25,7 +25,7 @@ async function getAccessToken(user?: User): Promise<string> {
       const { accessToken, expiresIn } = await refreshAccessToken(
         user.refreshToken
       )
-      
+
       // Update user's token information
       user.accessToken = accessToken
       user.tokenExpiry = new Date(Date.now() + expiresIn * 1000)
@@ -48,6 +48,8 @@ async function getAccessToken(user?: User): Promise<string> {
     qs.stringify({
       client_id: GOOGLE_CLIENT_ID,
       client_secret: GOOGLE_CLIENT_SECRET,
+     // !!! НЕ убирайте, этот refresh-token
+     // должен быть получен со scope-ами SCOPES
       refresh_token: GOOGLE_REFRESH_TOKEN,
       grant_type: 'refresh_token',
     }),
@@ -57,38 +59,23 @@ async function getAccessToken(user?: User): Promise<string> {
   return data.access_token as string
 }
 
-export type MeetAccessType = 'OPEN' | 'DEFAULT'
+export type MeetAccessType = 'OPEN' | 'TRUSTED' | 'RESTRICTED'
 
 /**
  * Create a Google Meet link.
  *
- * If `overrideAccessType` is provided it will be used as-is. Otherwise the
- * helper will pick `DEFAULT` for authorised users and `OPEN` for everyone
- * else.
+ * If `overrideAccessType` is provided it will be used as-is. Otherwise:
+ * - Unauthenticated users get `OPEN` links (anyone can join without approval)
+ * - Authenticated users get `TRUSTED` links (personal meetings)
  */
 export default async function createMeetLink(
   user?: User,
   overrideAccessType?: MeetAccessType
 ): Promise<string> {
-  const accessType: MeetAccessType = overrideAccessType
-    ? overrideAccessType
-    : user?.isAuthorized
-    ? 'DEFAULT'
-    : 'OPEN'
+  const accessType: MeetAccessType =
+    overrideAccessType ?? (user?.isAuthorized ? 'TRUSTED' : 'OPEN')
 
-  // Для публичных ссылок достаточно универсальной ссылки \u2014 без OAuth.
-  if (accessType === 'OPEN') {
-    return 'https://meet.google.com/new'
-  }
-
-  // Для приватных ссылок нужен accessToken.
-  let accessToken: string
-  try {
-    accessToken = await getAccessToken(user)
-  } catch (err) {
-    // Если не удалось получить токен \u2014 отдаём fallback.
-    return 'https://meet.google.com/new'
-  }
+  const accessToken = await getAccessToken(user)
 
   try {
     const { data } = await axios.post(
@@ -106,10 +93,21 @@ export default async function createMeetLink(
       }
     )
 
-    // `meetingUri` is полный URL; `meetingCode` \u2014 только код
+    // `meetingUri` is полный URL; `meetingCode` — только код
     return data.meetingUri as string
-  } catch (error) {
-    // Любая ошибка API \u2014 fallback
-    return 'https://meet.google.com/new'
+  } catch (error: any) {
+    console.error('Meet API Error:', {
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      config: {
+        url: error.config?.url,
+        method: error.config?.method,
+        data: error.config?.data,
+      },
+      isAuthorized: user?.isAuthorized,
+      accessType,
+    })
+    throw error
   }
 }

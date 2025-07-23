@@ -109,10 +109,9 @@ async function runApp() {
         })
       }
     } else {
-      // Public link (OPEN access)
+      // Public link (access type determined by authorization status)
       const link = await createMeetLink(
-        ctx.dbuser.isAuthorized ? ctx.dbuser : undefined,
-        'OPEN' as MeetAccessType
+        ctx.dbuser.isAuthorized ? ctx.dbuser : undefined
       )
       results.push({
         type: 'article',
