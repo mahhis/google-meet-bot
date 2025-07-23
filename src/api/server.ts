@@ -22,17 +22,17 @@ app.get('/health', (_: Request, res: Response) => {
 
 // Start the server
 export function startServer(port = 3000) {
-  return new Promise<void>((resolve) => {
+  return new Promise<{ close: () => Promise<void> }>((resolve) => {
     const server = app.listen(port, () => {
       console.log(`API server listening on port ${port}`)
-      resolve()
-    })
-
-    // Handle server shutdown
-    process.on('SIGTERM', () => {
-      console.log('SIGTERM signal received: closing HTTP server')
-      server.close(() => {
-        console.log('HTTP server closed')
+      resolve({
+        close: () => new Promise<void>((closeResolve) => {
+          console.log('Closing HTTP server')
+          server.close(() => {
+            console.log('HTTP server closed')
+            closeResolve()
+          })
+        })
       })
     })
   })

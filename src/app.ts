@@ -25,6 +25,7 @@ import sendStart from '@/handlers/start'
 import startMongo from '@/helpers/startMongo'
 import { startServer } from '@/api/server'
 import env from '@/helpers/env'
+import mongoose from 'mongoose'
 
 async function runApp() {
   console.log('Starting app...')
@@ -33,7 +34,7 @@ async function runApp() {
   console.log('Mongo connected')
   
   // Start API server for OAuth callbacks
-  await startServer(parseInt(env.PORT, 10))
+  const server = await startServer(parseInt(env.PORT, 10))
   console.log('API server started')
 
   bot
@@ -141,8 +142,28 @@ async function runApp() {
   bot.catch(console.error)
   // Start bot
   await bot.init()
-  run(bot)
+  const runner = run(bot)
   console.info(`Bot ${bot.botInfo.username} is up and running`)
+
+  // Graceful shutdown
+  const shutdown = async () => {
+    console.log('Shutting down gracefully...')
+    try {
+      runner.stop()
+      await bot.stop()
+      await server.close()
+      await mongoose.connection.close()
+      console.log('Application stopped successfully')
+      process.exit(0)
+    } catch (error) {
+      console.error('Error during shutdown:', error)
+      process.exit(1)
+    }
+  }
+
+  process.on('SIGTERM', shutdown)
+  process.on('SIGINT', shutdown)
+  process.on('SIGQUIT', shutdown)
 }
 
 void runApp()
