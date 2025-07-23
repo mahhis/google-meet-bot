@@ -82,7 +82,7 @@ async function runApp() {
             ctx.i18n.t('inline.private_description') ??
             'Click to create a private Meet link',
           input_message_content: {
-            message_text: buildMsg(link),
+            message_text: buildMsg(link.meetingUri),
             parse_mode: 'MarkdownV2',
             disable_web_page_preview: true,
           } as InputTextMessageContent,
@@ -109,22 +109,30 @@ async function runApp() {
         })
       }
     } else {
-      // Public link (access type determined by authorization status)
+      // Link (access type determined by authorization status)
       const link = await createMeetLink(
         ctx.dbuser.isAuthorized ? ctx.dbuser : undefined
       )
+      
+      // Show correct description based on user authorization status
+      const title = ctx.dbuser.isAuthorized 
+        ? (ctx.i18n.t('inline.private_title') ?? 'Private Google Meet')
+        : (ctx.i18n.t('inline.open_title') ?? 'Google Meet')
+      const description = ctx.dbuser.isAuthorized
+        ? (ctx.i18n.t('inline.private_description') ?? 'Click to create a private Meet link')
+        : (ctx.i18n.t('inline.open_description') ?? 'Click to create a public link')
+        
       results.push({
         type: 'article',
         id: uuid(),
-        title: ctx.i18n.t('inline.open_title') ?? 'Google Meet',
-        description:
-          ctx.i18n.t('inline.open_description') ?? 'Click to create a public link',
+        title,
+        description,
         input_message_content: {
-          message_text: buildMsg(link),
+          message_text: buildMsg(link.meetingUri),
           parse_mode: 'MarkdownV2',
           disable_web_page_preview: true,
         } as InputTextMessageContent,
-      })
+      })  
     }
 
     await ctx.answerInlineQuery(results, { cache_time: 0 })

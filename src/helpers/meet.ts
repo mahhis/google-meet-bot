@@ -61,17 +61,40 @@ async function getAccessToken(user?: User): Promise<string> {
 
 export type MeetAccessType = 'OPEN' | 'TRUSTED' | 'RESTRICTED'
 
+export interface MeetLinkResult {
+  meetingUri: string
+  accessType: MeetAccessType
+  isPublic: boolean
+}
+
+/**
+ * Get human-readable description of access type
+ */
+export function getMeetTypeDescription(accessType: MeetAccessType): string {
+  switch (accessType) {
+    case 'OPEN':
+      return 'Public Google Meet'
+    case 'TRUSTED':
+      return 'Private Google Meet'
+    case 'RESTRICTED':
+      return 'Restricted Google Meet'
+    default:
+      return 'Google Meet'
+  }
+}
+
 /**
  * Create a Google Meet link.
  *
  * If `overrideAccessType` is provided it will be used as-is. Otherwise:
- * - Unauthenticated users get `OPEN` links (anyone can join without approval)
- * - Authenticated users get `TRUSTED` links (personal meetings)
+ * - Unauthenticated users always get `OPEN` links (public, using global token)
+ * - Authenticated users get `TRUSTED` links by default (private, using their token)
+ * - To get public link for authenticated users, pass `overrideAccessType: 'OPEN'`
  */
 export default async function createMeetLink(
   user?: User,
   overrideAccessType?: MeetAccessType
-): Promise<string> {
+): Promise<MeetLinkResult> {
   const accessType: MeetAccessType =
     overrideAccessType ?? (user?.isAuthorized ? 'TRUSTED' : 'OPEN')
 
@@ -94,7 +117,11 @@ export default async function createMeetLink(
     )
 
     // `meetingUri` is полный URL; `meetingCode` — только код
-    return data.meetingUri as string
+    return {
+      meetingUri: data.meetingUri as string,
+      accessType,
+      isPublic: accessType === 'OPEN',
+    }
   } catch (error: any) {
     console.error('Meet API Error:', {
       status: error.response?.status,
