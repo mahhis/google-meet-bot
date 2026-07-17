@@ -23,16 +23,17 @@ app.get('/health', (_: Request, res: Response) => {
 // Start the server
 export function startServer(port = 3000) {
   return new Promise<{ close: () => Promise<void> }>((resolve) => {
-    const server = app.listen(port, () => {
-      console.log(`API server listening on port ${port}`)
+    const server = app.listen(port, '127.0.0.1', () => {
+      console.log(`API server listening on 127.0.0.1:${port}`)
       resolve({
-        close: () => new Promise<void>((closeResolve) => {
-          console.log('Closing HTTP server')
-          server.close(() => {
-            console.log('HTTP server closed')
-            closeResolve()
-          })
-        })
+        close: () =>
+          new Promise<void>((closeResolve) => {
+            console.log('Closing HTTP server')
+            server.close(() => {
+              console.log('HTTP server closed')
+              closeResolve()
+            })
+          }),
       })
     })
   })
