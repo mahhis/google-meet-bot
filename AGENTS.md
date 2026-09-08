@@ -1,0 +1,19 @@
+# google-meet-bot
+
+## Purpose
+Standalone deployed Telegram bot. The archived local directory name does not mean the VPS service is inactive.
+
+## Layout
+`src/` contains TypeScript application code; `locales/` contains messages; `dist/` is generated output. Runtime env and MongoDB data remain external.
+
+## Toolchain
+Target direction is Bun, but this repository currently has a verified Node/Yarn exception. CI pins Node 20.20.2 and executes the checked-in `.yarn/releases/yarn-3.1.0.cjs` directly, matching the existing lockfile and yarnPath. Do not use the stale packageManager field to silently select a different Yarn release. Bun 1.2.21 cannot import this Berry lockfile directly: it ignores it and resolves new versions. A Bun migration must compare dependency resolutions first; do not add a competing lockfile generated from ranges.
+
+## Commands
+`node .yarn/releases/yarn-3.1.0.cjs install --immutable` installs the locked graph. `node .yarn/releases/yarn-3.1.0.cjs build` compiles TypeScript without starting the bot. Source checks/install must use an isolated environment without production env or credentials. CI disables dependency install scripts.
+
+## Validation
+The initial CI gate verifies frozen installation, compilation and absence of tracked-source mutation. Existing `lint` is a separate failing baseline (formatting and/or ESLint issues); CI does not claim it passes. Fix those issues with focused review before adding a required lint gate. There is no verified offline application test suite here; do not run a placeholder test command or launch Telegram as a smoke test.
+
+## Boundaries
+Preserve user changes and existing database/Telegram contracts. `start` and `develop` launch the live application and are not checks. Do not read personal Downloads, bot sessions, .env files, or real database data for CI. No runtime or deployment change is implied by adding this workflow.
