@@ -14,7 +14,7 @@ import { run } from '@grammyjs/runner'
 import attachUser from '@/middlewares/attachUser'
 import bot from '@/helpers/bot'
 import configureI18n from '@/middlewares/configureI18n'
-import createMeetLink, { MeetAccessType } from '@/helpers/meet'
+import createMeetLink from '@/helpers/meet'
 import { generateAuthUrl } from '@/helpers/oauth'
 import handleAuth from '@/handlers/auth'
 import handleLanguage from '@/handlers/language'
@@ -73,8 +73,8 @@ async function runApp() {
 
     if (wantsPrivate) {
       if (ctx.dbuser.isAuthorized) {
-        // Private link (DEFAULT access)
-        const link = await createMeetLink(ctx.dbuser, 'DEFAULT' as MeetAccessType)
+        // Private link
+        const link = await createMeetLink(ctx.dbuser, 'TRUSTED')
         results.push({
           type: 'article',
           id: uuid(),
