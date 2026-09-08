@@ -11,3 +11,6 @@ dist
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+# Generated release and Python test output
+artifact/
+__pycache__/

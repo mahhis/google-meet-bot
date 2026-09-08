@@ -1,6 +1,7 @@
 import 'module-alias/register'
 import 'reflect-metadata'
 import 'source-map-support/register'
+import { activity, createLifecycle } from '@/helpers/lifecycle'
 
 import { v4 as uuid } from 'uuid'
 import type {
@@ -27,7 +28,18 @@ import { startServer } from '@/api/server'
 import env from '@/helpers/env'
 import mongoose from 'mongoose'
 
+let closeApi: () => Promise<void> = async () => {}
+const lifecycle = createLifecycle({
+  ready: () => mongoose.connection.readyState === 1,
+  close: async () => {
+    await closeApi()
+    await mongoose.connection.close()
+  },
+})
+
 async function runApp() {
+  await lifecycle.open()
+  bot.use(activity.middleware())
   console.log('Starting app...')
   // Mongo
   await startMongo()
@@ -35,6 +47,7 @@ async function runApp() {
   
   // Start API server for OAuth callbacks
   const server = await startServer(parseInt(env.PORT, 10))
+  closeApi = server.close
   console.log('API server started')
 
   bot
@@ -142,28 +155,10 @@ async function runApp() {
   bot.catch(console.error)
   // Start bot
   await bot.init()
-  const runner = run(bot)
+  lifecycle.launch(() => run(bot))
   console.info(`Bot ${bot.botInfo.username} is up and running`)
 
-  // Graceful shutdown
-  const shutdown = async () => {
-    console.log('Shutting down gracefully...')
-    try {
-      runner.stop()
-      await bot.stop()
-      await server.close()
-      await mongoose.connection.close()
-      console.log('Application stopped successfully')
-      process.exit(0)
-    } catch (error) {
-      console.error('Error during shutdown:', error)
-      process.exit(1)
-    }
-  }
 
-  process.on('SIGTERM', shutdown)
-  process.on('SIGINT', shutdown)
-  process.on('SIGQUIT', shutdown)
 }
 
 void runApp()

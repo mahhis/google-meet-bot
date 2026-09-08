@@ -34,5 +34,20 @@ jobs:
       - run: test "$(node .yarn/releases/yarn-3.1.0.cjs --version)" = 3.1.0
       - run: node .yarn/releases/yarn-3.1.0.cjs install --immutable
       - name: Quality checks
-        run: "node .yarn/releases/yarn-3.1.0.cjs build"
+        run: "node .yarn/releases/yarn-3.1.0.cjs build && node --test ops/tests/*.test.cjs && python3 -m unittest discover -s ops/tests -p \"test_*.py\" -v"
       - run: git diff --exit-code
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: '1.2.21'
+      - name: Package the checked Linux runtime once
+        env:
+          RELEASE_APP: google-meet-bot
+        run: |
+          echo 'b683f39a0dfbbf3d9bf2ac321df41f9ff877bea0f178f5c20670e976e566c135  ops/vendor/release.py' | sha256sum --check
+          bun ops/package-release.ts --app "$RELEASE_APP" --sha "$GITHUB_SHA" --run "$GITHUB_RUN_ID"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: google-meet-bot-release-${{ github.run_attempt }}
+          path: artifact/
+          if-no-files-found: error
+          retention-days: 14
