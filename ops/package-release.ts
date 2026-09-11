@@ -13,7 +13,7 @@ if (!/^[a-z][a-z0-9-]{1,40}$/.test(app ?? '') || !/^[a-f0-9]{40}$/.test(sha ?? '
 if (process.platform !== 'linux' || process.arch !== 'x64' || Bun.version !== '1.2.21') throw Error('Linux x64 Bun1.2.21 packaging required')
 if (execFileSync('node', ['--version'], { encoding: 'utf8' }).trim() !== 'v20.20.2') throw Error('Node20.20.2 runtime required')
 const source = process.cwd(); const temp = mkdtempSync(join(tmpdir(), 'bot-artifact-')); const stage = join(temp, 'stage')
-const helper = join(source, 'ops/vendor/release.py')
+const helper = process.env.PLATFORM_RELEASE_HELPER ?? '/usr/local/lib/platform-release/release.py'
 function python(args: string[]) { execFileSync('python3', [helper, ...args], { stdio: 'inherit' }) }
 try {
   // Include all locked dependencies: the existing bots import some devDependencies at runtime.
