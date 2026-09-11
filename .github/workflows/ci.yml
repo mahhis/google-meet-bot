@@ -1,14 +1,9 @@
 name: CI
-on:
-  workflow_dispatch:
-  pull_request:
-  push:
-    branches: [main, "codex/platform-*"]
 permissions:
   contents: read
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 jobs:
   check:
     runs-on: ubuntu-22.04
@@ -17,35 +12,95 @@ jobs:
       CI: 'true'
       YARN_ENABLE_SCRIPTS: 'false'
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
-        with:
-          node-version: '20.20.2'
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          path: |
-            .yarn/cache
-            ~/.yarn/berry/cache
-          key: yarn-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('yarn.lock', '.yarnrc.yml', '.yarn/releases/*') }}
-      - run: test "$(node .yarn/releases/yarn-3.1.0.cjs --version)" = 3.1.0
-      - run: node .yarn/releases/yarn-3.1.0.cjs install --immutable
-      - name: Quality checks
-        run: "node .yarn/releases/yarn-3.1.0.cjs build && node --test ops/tests/*.test.cjs && python3 -m unittest discover -s ops/tests -p \"test_*.py\" -v"
-      - run: git diff --exit-code
-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
-        with:
-          bun-version: '1.2.21'
-      - name: Package the checked Linux runtime once
-        env:
-          RELEASE_APP: google-meet-bot
-        run: |
-          echo 'b683f39a0dfbbf3d9bf2ac321df41f9ff877bea0f178f5c20670e976e566c135  ops/vendor/release.py' | sha256sum --check
-          bun ops/package-release.ts --app "$RELEASE_APP" --sha "$GITHUB_SHA" --run "$GITHUB_RUN_ID"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: google-meet-bot-release-${{ github.run_attempt }}
-          path: artifact/
-          if-no-files-found: error
-          retention-days: 14
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        persist-credentials: false
+    - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+      with:
+        node-version: 20.20.2
+    - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+      with:
+        path: |
+          .yarn/cache
+          ~/.yarn/berry/cache
+        key: yarn-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('yarn.lock', '.yarnrc.yml', '.yarn/releases/*') }}
+    - run: test "$(node .yarn/releases/yarn-3.1.0.cjs --version)" = 3.1.0
+    - run: node .yarn/releases/yarn-3.1.0.cjs install --immutable
+    - name: Quality checks
+      run: node .yarn/releases/yarn-3.1.0.cjs build && node --test ops/tests/*.test.cjs && python3 -m unittest discover -s
+        ops/tests -p "test_*.py" -v
+    - run: git diff --exit-code
+  deploy:
+    needs: check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.PLATFORM_RELEASES_ENABLED == 'true'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 55
+    steps:
+    - name: Build checked commit on VPS and activate
+      env:
+        VPS_HOST: ${{ secrets.VPS_HOST }}
+        VPS_PORT: ${{ secrets.VPS_PORT }}
+        VPS_USER: ${{ secrets.VPS_USER }}
+        VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        set -euo pipefail
+        [[ "$VPS_HOST" =~ ^[a-zA-Z0-9.-]+$ && "$VPS_PORT" =~ ^[0-9]+$ && "$VPS_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]
+        install -d -m 700 ~/.ssh
+        umask 077
+        printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/deploy
+        printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+        trap 'rm -f ~/.ssh/deploy' EXIT
+        {
+          printf '%s\n' "$GH_TOKEN"
+          cat <<'REMOTE'
+        set -euo pipefail
+        umask 022
+        export -n GH_TOKEN
+        export PATH=/usr/local/bin:/usr/bin:/bin
+        readonly sha="$1" run="$2" attempt="$3"
+        [[ "$sha" =~ ^[a-f0-9]{40}$ && "$run" =~ ^[0-9]+$ && "$attempt" =~ ^[0-9]+$ ]]
+        exec 9</var/lock/project-build.lock
+        flock -w 1800 9
+        test "$(bun --version)" = 1.2.21
+        test "$(df -Pk / | awk 'NR==2 {print $4}')" -gt 10485760
+        build="$(mktemp -d "$HOME/build.XXXXXXXX")"
+        incoming="$HOME/incoming/$run-$attempt"
+        trap 'rm -rf -- "$build"; rm -f -- "$incoming/release.tar.gz" "$incoming/release.json"; rmdir -- "$incoming" 2>/dev/null || true' EXIT
+        git_auth() {
+          GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=http.https://github.com/.extraheader \
+            GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)" \
+            git "$@"
+        }
+        url=https://github.com/mahhis/google-meet-bot.git
+        test "$(git_auth ls-remote "$url" refs/heads/main | cut -f1)" = "$sha" || exit 0
+        git init -q "$build/source"
+        cd "$build/source"
+        git_auth fetch -q --depth=1 "$url" "$sha"
+        git checkout -q --detach FETCH_HEAD
+        test "$(git rev-parse HEAD)" = "$sha"
+        export BUN_INSTALL_CACHE_DIR="$build/cache" CI=true
+        test "$(node --version)" = v20.20.2
+        export YARN_ENABLE_SCRIPTS=false
+        export YARN_GLOBAL_FOLDER="$build/yarn"
+        node .yarn/releases/yarn-3.1.0.cjs install --immutable
+        node .yarn/releases/yarn-3.1.0.cjs build
+        export PLATFORM_RELEASE_HELPER=/usr/local/lib/platform-release/release.py
+        bun ops/package-release.ts --app google-meet-bot --sha "$sha" --run "$run"
+        mkdir -p "$incoming"
+        cp artifact/release.* "$incoming/"
+        test "$(git_auth ls-remote "$url" refs/heads/main | cut -f1)" = "$sha" || exit 0
+        unset GH_TOKEN
+        sudo -n /usr/local/sbin/platform-release google-meet-bot "$incoming" "$sha" "$run"
+        REMOTE
+        } | ssh -i ~/.ssh/deploy -p "$VPS_PORT" -o BatchMode=yes -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes -o ConnectTimeout=15 "$VPS_USER@$VPS_HOST" \
+            "IFS= read -r GH_TOKEN; export GH_TOKEN; bash -s -- '$GITHUB_SHA' '$GITHUB_RUN_ID' '$GITHUB_RUN_ATTEMPT'"
+'on':
+  workflow_dispatch: null
+  pull_request: null
+  push:
+    branches:
+    - main
+    - codex/platform-*
